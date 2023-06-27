@@ -60,6 +60,11 @@ iptables -t nat -A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 iptables -t nat -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER
 iptables -t nat -A POSTROUTING -s ${DOCKER_NETWORK} ! -o ${DOCKER_INT} -j MASQUERADE
 
+iptables -N DOCKER-INCOMING
+iptables -A DOCKER-INCOMING -s 192.168.1.0/24 -j ACCEPT
+iptables -A DOCKER-INCOMING -p udp --dport 51820 -j ACCEPT
+iptables -A DOCKER-INCOMING -j DROP
+
 bridges=`docker network ls -q --filter='Driver=bridge'`
 
 for bridge in $bridges; do
@@ -98,7 +103,7 @@ if [ `echo ${containers} | wc -c` -gt "1" ]; then
                 dst_port=`echo ${dst} | awk -F'/' '{ print $1 }'`
                 dst_proto=`echo ${dst} | awk -F'/' '{ print $2 }'`
 
-                iptables -A DOCKER -d ${ipaddr}/32 ! -i ${DOCKER_NET_INT} -o ${DOCKER_NET_INT} -p ${dst_proto} -m ${dst_proto} --dport ${dst_port} -j ACCEPT
+                iptables -A DOCKER -d ${ipaddr}/32 ! -i ${DOCKER_NET_INT} -o ${DOCKER_NET_INT} -p ${dst_proto} -m ${dst_proto} --dport ${dst_port} -j DOCKER-INCOMING
 
                 iptables -t nat -A POSTROUTING -s ${ipaddr}/32 -d ${ipaddr}/32 -p ${dst_proto} -m ${dst_proto} --dport ${dst_port} -j MASQUERADE
 
